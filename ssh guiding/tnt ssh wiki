@@ -1,0 +1,135 @@
+Ssh - Secure Shell
+ssh ist ein Client-Server-System, das den Zugriff auf entfernte Rechner über eine verschlüsselte Verbindung ermöglicht. 
+Der Dienst erhält insbesondere dadurch große Wichtigkeit, dass er auch durch die Firewall des Instituts nicht komplett unterbunden wird. 
+
+Inhaltsverzeichnis
+•	1 Einloggen auf andere Rechner
+•	2 Einloggen von außerhalb des Clusters
+•	3 Public-Key Authentifizierung
+•	4 Erzeugen eines Key-Paares 
+o	4.1 Linux und macOS
+o	4.2 Windows
+o	4.3 Eintragen im Cluster
+•	5 Zugriff auf interne Dienste des TNT
+•	6 SSH Konfiguration für zuhause
+•	7 Übertragen von Dateien 
+o	7.1 Linux
+o	7.2 Windows
+Einloggen auf andere Rechner
+Mit 
+ssh user@rechner[.tnt.uni-hannover.de]
+loggt sich Benutzer user auf dem Rechner rechner.tnt.uni-hannover.de ein. Sollen Programme mit grafischer Oberfläche verwendet werden, ist mit der Option -Y das X11-Forwarding zu aktivieren. Zusätzlich läßt sich die Verbindung mit -C komprimieren, was das X11-Forwarding deutlich beschleunigt. 
+Das Einloggen per ssh von außerhalb mit aktiviertem X11-Forwarding und Kompression sieht also folgendermaßen aus: 
+ssh -CY user@ssh1.tnt.uni-hannover.de
+Einloggen von außerhalb des Clusters
+Von außerhalb des TNT-Netzes steht sicherheitsbedingt nur der Rechner 
+ssh1.tnt.uni-hannover.de
+für ssh-Zugriffe zur Verfügung. 
+Es ist dabei nur möglich, sich mit der Public-Key Authentifizierung anzumelden. Als weiterer Sicherheitsmerkmal wird zusätzlich das Systempasswort abgefragt. 
+Public-Key Authentifizierung
+Um sich von außerhalb in unseren Cluster einloggen zu können, muss sich der einloggende Rechner per Public-Key Verfahren authentifizieren. Dieses Verfahren beruht auf zwei Schlüssel-Dateien, dem privaten Schlüssel (Private-Key), welcher den Rechner exakt identifiziert, sowie dem öffentlichen Schlüssel (Public-Key). Während der Public-Key keinen besonderen Schutzmassnahmen bedarf, muss der Private-Key unbedingt geheim gehalten werden und darf den zugehörigen Rechner nicht verlassen! 
+Bei der Authetifizierung wird ein Authetifizierungs-String ausgehandelt, den der einloggende Rechner mit Hilfe seines Private-Keys verschlüsselt. Die Gegenstelle entschlüsselt und überprüft diesen dann wieder mit Hilfe des dort hinterlegten Public-Keys. 
+Erzeugen eines Key-Paares
+Linux und macOS
+Unter Linux und macOS läßt sich ein Key-Paar sehr leicht durch folgendes Kommando generieren: 
+ssh-keygen -t rsa
+Wahlweise lässt sich der Private-Key durch ein Passwort (genannt Passphrase) verschlüsseln. 
+Es werden folgende Dateien generiert: 
+~/.ssh/id_rsa     (der Private-Key)
+
+~/.ssh/id_rsa.pub (der Public -Key)
+Windows
+Unter Windows kann man bei Verwendung von putty das beiligende puttygen verwenden. Als Keyformat ist SSH2-RSA auszuwählen. 
+Beide Programme erzeugen allerdings Dateien in einem falschen Format. Der Public-Key muss daher vor dem Eintragen konvertiert werden (siehe unter Eintragen im Cluster). 
+Im Anschluss den Key zur Authentifizierung in den entsprechenden ssh-Client angeben. Hier ein Beispiel für putty: 
+•	 
+Server einstellen 
+•	 
+Private Key eintragen 
+•	 
+Usernamen voreinstellen 
+•	 
+Bei Bedarf Tunnel einrichten 
+•	 
+Profil speichern 
+Eintragen im Cluster
+Der Public-Key muss zur Authentifizierung der Gegenstelle (unserem Cluster) bekannt gemacht werden. Dazu kopiert man sich seinen generierten Public-Key auf ein geeignetes Medium oder schickt in sich einfach selbst per Mail zu. Auf keinen Fall darf der private Schlüssel (id_rsa) kopiert werden!!!
+
+Um ihn dem System bekannt zu machen, muss der Public-Key in die Datei 
+~/.ssh/authorized_keys
+eingetragen sein. Dies geschieht ganz leicht mit: 
+cat id_rsa.pub >> ~/.ssh/authorized_keys
+Sollte der Public-Key nicht im OpenSSH-Format vorliegen (weil er z.B. unter Windows erzeugt worden ist), muss er vor dem Eintragen konvertiert werden. 
+Das falsche Format ist an folgendem Aufbau zu erkenne: 
+---- BEGIN SSH2 PUBLIC KEY ----
+        [Keydaten]
+---- END SSH2 PUBLIC KEY ----
+Die Kovertierung kann man direkt beim Eintragen mit folgendem Befehl vornehmen (ein zusätzliches Eintragen wie oben beschrieben erübrigt sich): 
+ssh-keygen -if id_rsa.pub >> ~/.ssh/authorized_keys
+Zugriff auf interne Dienste des TNT
+Bestimmte Dienste (interne Webserver wie tntintern, tntorg und tntsystem, dieses Wiki, SVN-Server, EMail... etc) stehen nur für Zugriffe aus dem TNT zur Verfügung. Zugriffe von außerhalb werden durch die Firewall geblockt. Diese Einschränkung kann ssh umgehen. Folgender Text stammt vom Linux-Magazin: 
+
+Neben ihrer ursprünglichen Aufgabe, einen sicheren Remote Login zu ermöglichen, kann die SSH auch fast beliebige andere Protokolle absichern: Durch Port Forwarding kann sie TCP-Ports durch die sichere SSH-Verbindung umleiten. Dabei tritt SSH ähnlich wie ein Proxy auf, der auf der einen Seite des SSH-Kanals die Verbindung entgegennimmt und sie auf der anderen Seite mit dem jeweiligen Server verbindet. 
+Dabei kennt SSH zwei unterschiedliche Varianten: Local Port Forwarding und Remote Port Forwarding. In den meisten Fällen ist Local Port Forwarding die passende Lösung. Es leitet eine Verbindung, die auf einem lokalen (Client-seitigen) Port eintrifft, durch den sicheren SSH-Kanal auf einen Port auf einem entfernten Server weiter. Man kann dieses Verfahren daher auch als ausgehenden Tunnel bezeichnen. Die Syntax dieses Kommandos ist recht einfach: 
+ssh login@remote_host -L local_port:remote_host:remote_port
+Das Forwarding lässt sich beispielsweise dafür nutzen, eine POP3-Verbindung zur eigenen Mailbox abzusichern - der erste Teil zu OpenSSH [1] hatte POP3 ja bereits als potenzielle Gefahr ausgemacht. Der POP-Client überträgt das POP-Passwort schließlich im Klartext an den Server, auf dem Weg dahin ist es einfach abzuhören. Wer das verhindern will, auch wenn der Provider kein POP-SSL anbietet, kann die POP3-Verbindung durch SSH tunneln. 
+ssh kh@pop.remote.com -C -L 25025:pop.remote.com:110
+Ein verwegenes telnet localhost 25025 zeigt nun die Bannermeldung des entfernten POP3-Servers. Es funktioniert, ohne Root zu bemühen. Nun muss nur noch der POP-Client auf Localhost und Port 25025 eingestellt werden, um regulär seine Mail zu empfangen. 
+Den genauen Ablauf veranschaulicht Abbildung 4: Das SSH-Kommando baut eine normale SSH-Verbindung zum Server »pop.remote.com« auf und legt dabei zusätzlich den Tunnel an. So lange ein Login besteht, ist auch diese Weiterleitung aktiv. Verbindet sich nun ein POP3-Client (oder ein Telnet-Kommando) mit Port 25025 auf dem Client (Localhost), nimmt der SSH-Client diese Verbindung entgegen. Auf Server-Seite baut SSH die Verbindung zu Port 110 auf und leitet alle Daten weiter. 
+Nach diesem Prinzip lassen sich viele TCP-basierte Dienste - zum Beispiel SMTP, IMAP, LDAP oder NNTP, nicht aber FTP - umleiten und tunneln. Dieses Protokoll nutzt neben der Kontrollverbindung noch zusätzlich eine Datenverbindung, deren Ports es innerhalb der Kontrollverbindung aushandelt. Damit ist es zwar leicht, den Kontrollkanal abzusichern, die Datenverbindung bleibt aber unverschlüsselt. SSH bietet dafür mit »scp« und »sftp« geeigneten Ersatz. 
+Bespiel: 
+ssh -X -L 3690:svn:3690 -L 13306:caldb:3306 -L 8080:proxy:8080 user@ssh1.tnt.uni-hannover.de
+Jetzt können die folgenden internen Dienste über localhost genutzt werden: 
+•	SVN-Server über localhost:3690
+•	TNT-Calendar über localhost: 13306
+•	Proxyserver über localhost:8080
+SSH Konfiguration für zuhause
+Eventuelle eleganter die Konfiguration über die ssh Config Datei ~/.ssh/config
+Host ssh1
+  HostName ssh1.tnt.uni-hannover.de
+
+Host ssh2
+  HostName ssh2.tnt.uni-hannover.de
+
+Host ssh1 ssh2
+  User <username>
+  LocalForward 10023 <hostname>:22 
+  LocalForward 5900 <hostname>:5900 
+  LocalForward 10022 git:22 
+  LocalForward 3690 svn:3690 
+  LocalForward 13306 caldb:3306 
+  LocalForward 8080 proxy:8080 
+  ForwardX11 yes
+  Compression yes
+
+Host git tntgit
+  HostName localhost
+  Port 10022
+
+Host myhost
+  HostName localhost
+  User <username>
+  Port 10023
+Erklärung: 
+•	Die Variablen <username> und <hostname> müssen durch den eigenen Username bzw. Hostname ersetzt werden
+•	Die ersten beiden Abschnitte lenken ssh1 und ssh2 auf die Rechner ssh1.tnt.uni-hannover bzw. ssh2.tnt.uni-hannover.de um, d.h. bei allen ssh-Befehlen (ssh, scp, rsync, etc.) genügt es nun ssh1 statt ssh1.tnt.uni-hannover.de anzugeben
+•	Der dritte Abschnitt legt den Standardusernamen fest, d.h. bei ssh-Befehlen muss der Username nicht angegeben werden. Das ist insbesondere interessant, wenn der Username im Cluster verschieden vom lokalen Usernamen ist.
+•	Es werden etliche Services des TNT-Clusters auf Ports des localhost bereitgestellt. Im einzelnen sind dies: 
+o	ssh-Server für den eigenen Rechner im TNT-Cluster auf Port 10023
+o	vnc-Server für den eigenen Rechner im TNT-Cluster auf Port 5900
+o	git-Server auf Port 10022
+o	svn-Server auf Port 3690
+o	tnt-Calendar (MySQL) auf Port 13306
+o	Proxy-Server auf Port 8080 (siehe Configure proxy for specific webpages)
+•	Die X11-Umlenkung wird aktiviert, d.h. im TNT-Cluster gestartete Programme zeigen ihr Ausgabe auf dem lokalen Rechner an
+•	Compression wird aktiviert.
+•	Der vierte Abschnitt stellt unter dem Namen git den git-Server des tnt bereit, da dieser ja auf localhost:10022 zur Verfügung stellt.
+•	Der fünfte Abschnitt stellt entsprechndend den ssh-Server des eigenen Rechners im Cluster für lokalen Zugriff bereit. Wenn also eine ssh-Verbindung ins Cluster steht, kann im folgenden direkt auf den eigenen Rechner über ssh myhost, scp myhost, rsync myhost etc. zugreifen.
+Übertragen von Dateien
+Oft will man Dateien zwischen verschiedenen Rechnern kopieren bzw. verschieben. Je nach Betriebssystem des eigenen Rechners, ergeben sich da verschiedene Möglichkeiten. Hier nur eine kurze (mit Sicherheit unvollständige) Liste. 
+Linux
+•	scp
+•	rsync
+Windows
+•	"WinSCP ist ein grafischer Open Source SFTP und FTP Client für Windows, der auch das alte SCP-Protokoll unterstützt. Er bietet einen geschützten Daten- und Dateitransfer zwischen verschiedenen Rechnern und ermöglicht die Nutzung geschützter Tunnel."
+
