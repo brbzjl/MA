@@ -1,0 +1,35 @@
+。:
+先将.ssh文件夹放到c盘user里的用户名文件夹里
+
+。:
+1. 连接到服务器ssh1（自己电脑上）：ssh -CY bai@ssh1.tnt.uni-hannover.de
+
+。:
+2. 连接到电脑cp2013-03（在ssh1上）：ssh -CY cp2013-03
+
+。:
+3. 在电脑cp2013-03上运行vncserver（在cp2013-03上）：vncserver -geometry 1280x720 :8
+
+。:
+ 1. ssh 的Local Forwarding（自己电脑）：ssh -fNCT -L 5907:cp2013-03:5908 bai@ssh1.tnt.uni-hannover.de
+
+。:
+5. 在自己电脑上用vncviewer接收画面（自己电脑上）：打开vncviewer，输入localhost:5907，连接即可
+
+。:
+Nautilus
+
+
+the name of server in tnt
+persephone :gpu 1080 8
+ilmarinen :hanno
+athene : gpu titan 4
+
+pairs 1-4 cpu server
+helena 1-4 cpu server
+cp2013-01:13 pc in the student work room
+
+pc key !BRB2010dreamer
+mail BRB2010dreamer!
+web and xx !BRBzjl2013 BRBzjl2013!
+
