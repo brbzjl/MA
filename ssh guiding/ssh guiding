@@ -12,7 +12,7 @@
 
 。:
  1. ssh 的Local Forwarding（自己电脑）：ssh -fNCT -L 5907:cp2013-03:5908 bai@ssh1.tnt.uni-hannover.de
-
+ putty 使用 ssh下的tunnel，source port 5907, destination: cp2013-03:5908. 将5908映射到本地5907
 。:
 5. 在自己电脑上用vncviewer接收画面（自己电脑上）：打开vncviewer，输入localhost:5907，连接即可
 
