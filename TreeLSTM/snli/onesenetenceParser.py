@@ -14,11 +14,16 @@ from parser_predictor import Parser
 from util import get_args
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
+
 #--------------setting device-------------
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(device)
 args = get_args()
 torch.cuda.set_device(0)
+LOG_FOUT = open(os.path.join(args.save_path, 'log_train.txt'), 'w')
+header = '  Time Epoch Iteration Progress    (%Epoch)   Loss   Dev/Loss     Accuracy  Dev/Accuracy'
+LOG_FOUT.write(str(header) + '\n')
+LOG_FOUT.flush()
 #--------------prepare training test and vali data-------------
 inputs = datasets.nli.ParsedTextField(lower=args.lower)
 transitions = datasets.nli.ShiftReduceField()
@@ -69,8 +74,13 @@ dev_log_template = ' '.join('{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0
 log_template =     ' '.join('{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{},{:12.4f},{}'.split(','))
 os.makedirs(args.save_path, exist_ok=True)
 print(header)
+LOG_FOUT = open(os.path.join(args.save_path, 'log_train.txt'), 'w')
+LOG_FOUT.write(str(header) + '\n')
+LOG_FOUT.flush()
 #----------------------------------------
 for epoch in range(args.epochs):
+    LOG_FOUT.write('----'*10+ str(epoch) + '----'*10+ '\n')
+    LOG_FOUT.flush()
     train_iter.init_epoch()#Set up the batch generator for a new epoch.
     n_correct = n_total = train_loss = 0
     for batch_idx, batch in enumerate(train_iter):
@@ -84,20 +94,21 @@ for epoch in range(args.epochs):
         # print(batch.premise_transitions, '\n')
         loss,acc = model(batch)
         n_correct += acc
-        n_total += batch.batch_size
+        sentenceLEN = batch.premise_transitions.size(0)
+        n_total += batch.batch_size * sentenceLEN
         train_acc = 100. * n_correct / n_total
 
         loss.backward();
         opt.step();
         train_loss += loss.data.item() * batch.batch_size
-        if iterations % args.save_every == 0:
+        if iterations % args.save_every == 0:#1000
             snapshot_prefix = os.path.join(args.save_path, 'snapshot')
             snapshot_path = snapshot_prefix + '_acc_{:.4f}_loss_{:.6f}_iter_{}_model.pt'.format(train_acc, train_loss / n_total, iterations)
             torch.save(model.state_dict(), snapshot_path)
             for f in glob.glob(snapshot_prefix + '*'):
                 if f != snapshot_path:
                     os.remove(f)
-        if iterations % args.dev_every == 0:
+        if iterations % args.dev_every == 0:#1000
             model.eval(); dev_iter.init_epoch()
             n_dev_correct = dev_loss = 0
             for dev_batch_idx, dev_batch in enumerate(dev_iter):
@@ -118,8 +129,14 @@ for epoch in range(args.epochs):
                 for f in glob.glob(snapshot_prefix + '*'):
                     if f != snapshot_path:
                         os.remove(f)
-        elif iterations % args.log_every == 0:
-            print(log_template.format(time.time()-start,
-                epoch, iterations, 1+batch_idx, len(train_iter),
-                100. * (1+batch_idx) / len(train_iter), train_loss / n_total, ' '*8, n_correct / n_total, ' '*12))
+        elif iterations % 1 == 0:#50 args.log_every
+            wout = (log_template.format(time.time() - start,
+                epoch, iterations, 1 + batch_idx, len(train_iter),
+                100. * (1 + batch_idx) / len(train_iter), train_loss / n_total, ' ' * 8,
+                n_correct / n_total, ' ' * 12))
+            print(wout)
             n_correct = n_total = train_loss = 0
+            LOG_FOUT.write(str(wout) + '\n')
+            LOG_FOUT.flush()
+LOG_FOUT.close()
+
