@@ -16,7 +16,7 @@ def get_args():
     parser.add_argument('--lr', type=float, default=.001)
     parser.add_argument('--lr_decay_by', type=float, default=1)
     parser.add_argument('--lr_decay_every', type=float, default=1)
-    parser.add_argument('--dev_every', type=int, default=100)
+    parser.add_argument('--dev_every', type=int, default=1000)
     parser.add_argument('--save_every', type=int, default=1000)
     parser.add_argument('--embed_dropout', type=float, default=0.2)
     parser.add_argument('--mlp_dropout', type=float, default=0.2)
