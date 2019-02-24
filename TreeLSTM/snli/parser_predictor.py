@@ -73,8 +73,8 @@ class Parser(nn.Module):
             prem_trans = batch.premise_transitions
         else:
             prem_trans = None
-        loss = self.encoder(prem_embed, prem_trans)#128x300,
+        trans_pred = self.encoder(prem_embed, prem_trans)#128x300,
 
         #scores = self.out(self.feature(premise, hypothesis))
         #print(premise[0][:5], hypothesis[0][:5])
-        return loss
+        return trans_pred
