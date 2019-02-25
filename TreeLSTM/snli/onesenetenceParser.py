@@ -27,8 +27,9 @@ def calcu_loss(trans_truths,trans_pres):
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
-is_training = True
+is_training = False
 #--------------setting device-------------
+#os.environ["CUDA_VISIBLE_DEVICES"]="3"
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(device)
 args = get_args()
@@ -38,20 +39,21 @@ header = '  Time Epoch Iteration Progress    (%Epoch)   Loss   Dev/Loss     Accu
 LOG_FOUT.write(str(header) + '\n')
 LOG_FOUT.flush()
 #--------------prepare training test and vali data-------------
-inputs = datasets.nli.ParsedTextField(lower=args.lower)
-transitions = datasets.nli.ShiftReduceField()
-answers = data.Field(sequential=False)
+if 1:
+    inputs = datasets.nli.ParsedTextField(lower=args.lower)
+    transitions = datasets.nli.ShiftReduceField()
+    answers = data.Field(sequential=False)
 
-train, dev, test = datasets.SNLI.splits(inputs, answers, transitions)
-
-print(train[0].__dict__.keys())
-print(train[0].premise[:10])
-print(train[0].premise_transitions[:10])
-#inputs.build_vocab(train, dev, test, max_size=100000, vectors=vec)
-inputs.build_vocab(train, dev, test)
-answers.build_vocab(train)
-train_iter, dev_iter, test_iter = data.BucketIterator.splits(
-    (train, dev, test), batch_size=args.batch_size, device=device)#######
+    train, dev, test = datasets.SNLI.splits(inputs, answers, transitions)
+    #
+    # print(train[0].__dict__.keys())
+    # print(train[0].premise[:10])
+    # print(train[0].premise_transitions[:10])
+    #inputs.build_vocab(train, dev, test, max_size=100000, vectors=vec)
+    inputs.build_vocab(train, dev, test)
+    answers.build_vocab(train)
+    train_iter, dev_iter, test_iter = data.BucketIterator.splits(
+        (train[0], dev[0], test[0]), batch_size=args.batch_size, device=device)#######
 
 #--------------------------- -------------
 
@@ -77,21 +79,23 @@ model.cuda()
 criterion = nn.CrossEntropyLoss()
 opt = optim.RMSprop(model.parameters(), lr=config.lr, alpha=0.9, eps=1e-6,
                 weight_decay=config.regularization)
-#----------------------------------------
-iterations = 0
-start = time.time()
-best_dev_acc = -1
-train_iter.repeat = False
-header = '  Time Epoch Iteration Progress    (%Epoch)   Loss   Dev/Loss     Accuracy  Dev/Accuracy'
-dev_log_template = ' '.join('{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{:8.6f},{:12.4f},{:12.4f}'.split(','))
-log_template =     ' '.join('{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{},{:12.4f},{}'.split(','))
-os.makedirs(args.save_path, exist_ok=True)
-print(header)
-LOG_FOUT = open(os.path.join(args.save_path, 'log_train.txt'), 'w')
-LOG_FOUT.write(str(header) + '\n')
-LOG_FOUT.flush()
+
 #----------------------------------------
 if is_training:
+    # ----------------------------------------
+    iterations = 0
+    start = time.time()
+    best_dev_acc = -1
+    train_iter.repeat = False
+    header = '  Time Epoch Iteration Progress    (%Epoch)   Loss   Dev/Loss     Accuracy  Dev/Accuracy'
+    dev_log_template = ' '.join(
+        '{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{:8.6f},{:12.4f},{:12.4f}'.split(','))
+    log_template = ' '.join('{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{},{:12.4f},{}'.split(','))
+    os.makedirs(args.save_path, exist_ok=True)
+    print(header)
+    LOG_FOUT = open(os.path.join(args.save_path, 'log_train.txt'), 'w')
+    LOG_FOUT.write(str(header) + '\n')
+    LOG_FOUT.flush()
     for epoch in range(args.epochs):
         LOG_FOUT.write('----'*10+ str(epoch) + '----'*10+ '\n')
         LOG_FOUT.flush()
@@ -155,11 +159,59 @@ if is_training:
                 LOG_FOUT.flush()
     LOG_FOUT.close()
 else:# using for test
-    model_path = os.path.join(args.save_path, 'best_snapshot')
-    model_name = model_path + '_1.pt'
-    model.load_state_dict(torch.load(model_name))
-    trans_pred = model(batch)
+    model_path = os.path.join(args.save_path, '1.pt')
+    #model_name = model_path + '_1.pt'
+    model.load_state_dict(torch.load(model_path))
+    # sentence = ['the', 'church', 'has', 'cracks', 'in', 'the', 'ceiling', '.']
+    # batch = {'premise':sentence}
+    # batch = torch.Tensor(batch).cuda()
+    for batch_idx, batch in enumerate(test_iter):
+        trans_pred = model(batch)
+        trans_len = batch.premise_transitions.size(0)
+        pre1=[]
+        pre2 = []
+        for n_trans in range(trans_len):
+            trans_truth = batch.premise_transitions[n_trans]
+            trans_pre = trans_pred[n_trans]
+            # first is the max value in dim 1, and the second is the index of the maximum
+            trans_preds_max = trans_pre.max(1)[1]
+            pre1.append(trans_preds_max[0])
+            pre2.append(trans_truth[0])
+        #print(batch.premise[:,0])
+        print(test[0].premise)
+        print(test[0].premise_transitions)
+        print(pre2)
+        print(pre1)
+        break
+class node(object):
+    def __init__(self, value, children = []):
+        self.value = value
+        self.children = children
+    def __repr__(self, level=0):
+        return self.value
+buffer =[]
+stack =[]
+sentence= test[0].premise
+for item in pre2:
+    if item == 3:#shift push the item into stack
+        stack.append(sentence.pop(0))
+    if item == 2:#reduce pop the first two elements in stack and reduce and push back to the buffer
+        root = node('grandmother')
+        root.children = [(stack.pop(-2)), (stack.pop(-1))]
+        stack.append(root)
 
+print(stack[0].value)
+print(stack[0])
+
+def dfs_show(root, depth):
+    if depth == 0:
+        print("root:" + root.value + "")
+    if hasattr(root,'children'):
+        for item in root.children:
+            print("|      " * depth + "+--" , item)
+            dfs_show(item, depth +1)
+
+dfs_show(stack[0],0)
 
 
 
