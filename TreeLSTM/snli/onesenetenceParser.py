@@ -12,7 +12,7 @@ from torchtext import datasets
 from parser_predictor import Parser
 
 from util import get_args
-
+import json
 def calcu_loss(trans_truths,trans_pres):
     trans_len = trans_truths.size(0)
     trans_loss, trans_acc = 0, 0
@@ -24,6 +24,51 @@ def calcu_loss(trans_truths,trans_pres):
         trans_loss += criterion(trans_pre, trans_truth)
         trans_acc += torch.sum((trans_preds_max.data == trans_truth.data).float())
     return trans_loss,trans_acc
+class mydataset():
+    def __init__(self,path,device,data_format='json'):
+        self.test_ppid_dataset_path = path
+        self.data_format = data_format
+        self.device = device
+    def write_dataset(self):
+        data_format = self.data_format.lower()
+        # dict_dataset = [
+        #     {"id": "0", "question1": "When do you use シ instead of し?",
+        #      "question2": "When do you use \"&\" instead of \"and\"?",
+        #      "label": "0"},
+        #     {"id": "1", "question1": "Where was Lincoln born?",
+        #      "question2": "Which location was Abraham Lincoln born?",
+        #      "label": "1"},
+        #     {"id": "2", "question1": "What is 2+2",
+        #      "question2": "2+2=?",
+        #      "label": "1"},
+        # ]
+        sentence = {"premise": "the church has cracks in the ceilin ."}
+        dict_dataset = [sentence]
+        with open(self.test_ppid_dataset_path, "w") as test_ppid_dataset_file:
+            for example in dict_dataset:
+                if data_format == "json":
+                    test_ppid_dataset_file.write(json.dumps(example) + "\n")
+                else:
+                    raise ValueError("Invalid format {}".format(data_format))
+
+    def build_dateset(self):
+        question_field = data.Field(sequential=True)
+
+        # fields = {"question1": ("q1", question_field),
+        #           "question2": ("q2", question_field),
+        #           "label": ("label", label_field)}
+        fields = {"premise": ("premise", question_field)}
+        test = data.TabularDataset(
+            path=self.test_ppid_dataset_path, format=self.data_format, fields=fields)
+        print(test[0].__dict__.keys())
+        print(test[0].premise)
+        #print(dataset[1].premise)
+        question_field.build_vocab(test)
+        iter = data.BucketIterator(test, repeat = True, batch_size=128, device=self.device)
+        return iter
+
+
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
@@ -39,7 +84,7 @@ header = '  Time Epoch Iteration Progress    (%Epoch)   Loss   Dev/Loss     Accu
 LOG_FOUT.write(str(header) + '\n')
 LOG_FOUT.flush()
 #--------------prepare training test and vali data-------------
-if 1:
+if is_training:
     inputs = datasets.nli.ParsedTextField(lower=args.lower)
     transitions = datasets.nli.ShiftReduceField()
     answers = data.Field(sequential=False)
@@ -53,13 +98,13 @@ if 1:
     inputs.build_vocab(train, dev, test)
     answers.build_vocab(train)
     train_iter, dev_iter, test_iter = data.BucketIterator.splits(
-        (train[0], dev[0], test[0]), batch_size=args.batch_size, device=device)#######
+        (train, dev, test), batch_size=args.batch_size, device=device)#######
 
 #--------------------------- -------------
 
 #--------------configure of setting-------------
 config = args
-config.n_embed = len(inputs.vocab)
+config.n_embed = 36990#len(inputs.vocab) 36990
 config.lr = 2e-3 # 3e-4
 config.lr_decay_by = 0.75
 config.lr_decay_every = 1 #0.6
@@ -162,25 +207,29 @@ else:# using for test
     model_path = os.path.join(args.save_path, '1.pt')
     #model_name = model_path + '_1.pt'
     model.load_state_dict(torch.load(model_path))
-    # sentence = ['the', 'church', 'has', 'cracks', 'in', 'the', 'ceiling', '.']
+    sentence = ['the', 'church', 'has', 'cracks', 'in', 'the', 'ceiling', '.']
     # batch = {'premise':sentence}
     # batch = torch.Tensor(batch).cuda()
-    for batch_idx, batch in enumerate(test_iter):
+    datamy = mydataset('test.json',device)
+    datamy.write_dataset()
+    dataset = datamy.build_dateset()
+
+    for batch_idx, batch in enumerate(dataset):
         trans_pred = model(batch)
-        trans_len = batch.premise_transitions.size(0)
+        trans_len = len(trans_pred)#trans_predbatch.premise_transitions.size(0)
         pre1=[]
         pre2 = []
         for n_trans in range(trans_len):
-            trans_truth = batch.premise_transitions[n_trans]
+            #trans_truth = batch.premise_transitions[n_trans]
             trans_pre = trans_pred[n_trans]
             # first is the max value in dim 1, and the second is the index of the maximum
             trans_preds_max = trans_pre.max(1)[1]
             pre1.append(trans_preds_max[0])
-            pre2.append(trans_truth[0])
+            #pre2.append(trans_truth[0])
         #print(batch.premise[:,0])
-        print(test[0].premise)
-        print(test[0].premise_transitions)
-        print(pre2)
+        #print(batch.premise)
+        #print(test[0].premise_transitions)
+        #print(pre2)
         print(pre1)
         break
 class node(object):
@@ -191,14 +240,16 @@ class node(object):
         return self.value
 buffer =[]
 stack =[]
-sentence= test[0].premise
-for item in pre2:
+
+for i,item in enumerate(pre1):
     if item == 3:#shift push the item into stack
         stack.append(sentence.pop(0))
     if item == 2:#reduce pop the first two elements in stack and reduce and push back to the buffer
         root = node('grandmother')
         root.children = [(stack.pop(-2)), (stack.pop(-1))]
         stack.append(root)
+    if i >8:
+        break
 
 print(stack[0].value)
 print(stack[0])
