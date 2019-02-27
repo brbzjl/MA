@@ -64,10 +64,13 @@ class Parser(nn.Module):
         # the first dim is 51 the sequence itself,  the length of sequence(words)
         # the second dim is the batch size 128
         # the third is indexes elements of the input 300 the embedding vectors length of each words
-
-        prem_embed = self.embed(batch.premise[0])
+        #print(batch.premise)
+        if self.config.is_training:
+            prem_embed = self.embed(batch.premise[0])  #
+        else:
+            prem_embed = self.embed(batch.premise)  # [0]
         prem_embed = self.projection(prem_embed)  # no relu
-        prem_embed = self.embed_dropout(self.embed_bn(prem_embed))
+        prem_embed = self.embed_dropout(self.embed_bn(prem_embed))#39x128x600
 
         if hasattr(batch, 'premise_transitions'):
             prem_trans = batch.premise_transitions
