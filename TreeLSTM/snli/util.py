@@ -28,7 +28,7 @@ def get_args():
     parser.add_argument('--predict_transitions', action='store_false', dest='predict')
     parser.add_argument('--spinn', action='store_false', dest='spinn')
     parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--save_path', type=str, default='results')
+    parser.add_argument('--save_path', type=str, default='results_parser')
     parser.add_argument('--data_cache', type=str, default=os.path.join(os.getcwd(), '.data_cache'))
     parser.add_argument('--vector_cache', type=str, default=os.path.join(os.getcwd(), '.vector_cache/input_vectors.pt'))
     parser.add_argument('--word_vectors', type=str, default='glove.42B')
