@@ -50,7 +50,7 @@ class mydataset():
         sentenceDict = {"premise": "The church has cracks in the ceiling ."}
         self.dict_dataset.append(sentenceDict)
         self.sentences.append(sentence.split(' '))
-        if not os.path.exists(self.test_ppid_dataset_path):
+        if not os.path.exists(self.dataset_path):
             with open(self.dataset_path, "w") as file:
                 for example in self.dict_dataset:
                     if data_format == "json":

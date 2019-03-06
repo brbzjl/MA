@@ -134,7 +134,8 @@ class SPINN1(nn.Module):
         buffers = [list(torch.split(b.squeeze(1), 1, 0))
                    for b in torch.split(buffers, 1, 1)]
         # 128 lists 2 items, 1x600
-        stacks = [[buf[0], buf[0]] for buf in buffers]
+        stacks = [[buf.pop(0), buf.pop(0)] for buf in buffers]
+        #stacks = [[] for buf in buffers]
 
         self.tracker.reset_state()
 
@@ -142,7 +143,7 @@ class SPINN1(nn.Module):
             num_transitions = transitions.size(0)
             trans_loss, trans_acc = 0, 0
         else:
-            num_transitions = len(buffers[0]) * 2 - 3
+            num_transitions = (len(buffers[0])+2) * 2 - 1 - 2 # minus 2 is because there are already 2 pushed into the stack. so less 2 shift operations
         #num_transitions 83 128
         trans_preds_batch = []
         for i in range(num_transitions):
@@ -152,10 +153,13 @@ class SPINN1(nn.Module):
                 tracker_states, trans_preds = self.tracker(buffers, stacks) # 128x4 ,4 is the probable results
                 if trans_preds is not None:
                     trans_preds_batch.append(trans_preds)
-                    if transitions is not None:
-                        trans = transitions[i]  # grundtruth
-                    else:
-                        trans = trans_preds.max(1)[1]
+                    # if transitions is not None:
+                    #     trans = transitions[i]  # grundtruth
+                    # else:
+                    #     trans = trans_preds.max(1)[1]
+                    trans = trans_preds.max(1)[1]
+                    # print('predict: ',trans)
+                    # print('true trans: ',transitions[i])
                     # if transitions is not None:
                     #     trans_loss += F.cross_entropy(trans_preds, trans)
                     #     # a= (trans_preds_max.data == trans.data)
@@ -168,19 +172,30 @@ class SPINN1(nn.Module):
             for transition, buf, stack, tracking in batch:  # 128 loops iterations
                 # 128 batch size iterations
                 if transition == 3:  # shift
-                    stack.append(buf.pop())
+                    if len(buf)>0:
+                        temp = buf.pop(0)
+                        stack.append(temp)
+                    if len(buf) < 1:
+                        #torch.tensor([0]*300)
+                        buf.append(temp)
                 elif transition == 2:  # reduce
                     # 81 lists 1x600
-                    rights.append(stack.pop())
-                    lefts.append(stack.pop())
-                    # 81 1x128
-                    trackings.append(tracking)
+                    if len(stack)>1:
+                        # rights.append(stack.pop())
+                        # lefts.append(stack.pop())
+                        right = stack.pop()
+                        left = stack.pop()
+                        # # 81 1x128
+                        # trackings.append(tracking)
                     # if here in each step calculate the reduced result? what will happen
-                    # reduced = self.reduce(lefts[-1].unsqueeze(0), rights[-1].unsqueeze(0), tracking.unsqueeze(0))
-                    # stack.append(reduced)
-            if rights:#if there are some items needed to be reduced, reduce them add push back into the corresponding stack
-                reduced = iter(self.reduce(lefts, rights, trackings))
-                for transition, stack in zip(trans.data, stacks):# 128 loops
-                    if transition == 2:
-                        stack.append(next(reduced))
+                        # reduced is a tuple
+                        reduced = self.reduce(left.unsqueeze(0), right.unsqueeze(0), tracking.unsqueeze(0))
+                        stack.append(reduced[0])
+                    if len(stack) < 2:
+                        stack.append(reduced[0])
+            # if rights:#if there are some items needed to be reduced, reduce them add push back into the corresponding stack
+            #     reduced = iter(self.reduce(lefts, rights, trackings))
+            #     for transition, stack in zip(trans.data, stacks):# 128 loops
+            #         if transition == 2:
+            #             stack.append(next(reduced))
         return trans_preds_batch
